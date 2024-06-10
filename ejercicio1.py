@@ -11,16 +11,6 @@ gray_image = cv2.cvtColor(imagen_placa, cv2.COLOR_BGR2GRAY)
 # Aplicar suavizado a la imagen
 blurred_image = cv2.GaussianBlur(gray_image, (5, 5), 0)
 
-# Aplicar el algoritmo de Canny para la detección de bordes
-edges = cv2.Canny(blurred_image, 50, 150)
-
-# Dilatar los bordes para cerrar los contornos
-kernel = np.ones((5, 5), np.uint8)
-dilated_edges = cv2.dilate(edges, kernel, iterations=1)
-
-# Encontrar contornos en los bordes dilatados (para resistencias)
-contours_resistors, _ = cv2.findContours(dilated_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
 # Crear una copia de la imagen para dibujar los contornos
 imagen_contornos_resistores = imagen_placa.copy()
 
@@ -68,11 +58,14 @@ plt.show()
 mask_chip = cv2.inRange(hsv_image, lower_gray, upper_gray)
 mask_capacitor = cv2.inRange(hsv_image, lower_silver, upper_silver)
 
+kernel = np.ones((5, 5), np.uint8)
+
 # Aplicar preprocesamiento (suavizado) antes de Canny
 blurred_image = cv2.medianBlur(imagen_placa, ksize=8)
 
 # Aplicar el algoritmo de Canny para la detección de bordes
 edges_resistencia = cv2.Canny(blurred_image, 0.20*255, 0.40*255)
+dilated_edges = cv2.dilate(edges_resistencia, kernel, iterations=1)
 
 #Gradiente morfológico
 kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
@@ -105,7 +98,7 @@ contornos_capacitor, _ = cv2.findContours(mask_capacitor, cv2.RETR_EXTERNAL, cv2
 def mostrar_contornos(imagen, contornos_resistencia, contornos_chip, contornos_capacitor):
     for cnt in contornos_resistencia:
         area = cv2.contourArea(cnt)
-        if 1800 < area < 4000:  # Ajusta los umbrales según tus necesidades
+        if 2000 < area < 2800:  # Ajusta los umbrales según tus necesidades
             x, y, w, h = cv2.boundingRect(cnt)
             cv2.rectangle(imagen, (x, y), (x + w, y + h), (0, 0, 255), 2)
             cv2.putText(imagen, 'RESISTENCIA', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
@@ -142,3 +135,69 @@ plt.imshow(cv2.cvtColor(imagen_contornos_clasificados, cv2.COLOR_BGR2RGB))
 plt.title('Componentes electrónicos detectados y clasificados')
 plt.axis('off')
 plt.show()
+
+# Clasificar capacitores por tamaño
+def classify_capacitors_by_size(capacitors):
+    small = []
+    medium = []
+    large = []
+
+    for cnt in capacitors:
+        x, y, w, h = cv2.boundingRect(cnt)
+        area = w * h
+        if 7500 <= area < 15000:
+            small.append((x, y, w, h))
+        elif 15000 <= area < 80000:
+            medium.append((x, y, w, h))
+        elif area > 80000:
+            large.append((x, y, w, h))
+
+    return small, medium, large
+
+def classify_resistencia(contornos_resistencia):
+    resistor_count = 0
+    for contour in contornos_resistencia:
+            area = cv2.contourArea(contour)
+            # Contador de resistores
+            if  2000 < area < 2800: 
+                resistor_count += 1
+
+    return resistor_count
+
+# Clasificar los capacitores
+small_capacitors, medium_capacitors, large_capacitors = classify_capacitors_by_size(contornos_capacitor)
+
+# Dibujar los capacitores clasificados en la imagen
+output_capacitors_size = imagen_placa.copy()
+
+for (x, y, w, h) in small_capacitors:
+    cv2.rectangle(output_capacitors_size, (x, y), (x + w, y + h), (255, 0, 0), 2)
+    cv2.putText(output_capacitors_size, 'Pequeño', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+for (x, y, w, h) in medium_capacitors:
+    cv2.rectangle(output_capacitors_size, (x, y), (x + w, y + h), (0, 255, 0), 2)
+    cv2.putText(output_capacitors_size, 'Mediano', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+for (x, y, w, h) in large_capacitors:
+    cv2.rectangle(output_capacitors_size, (x, y), (x + w, y + h), (0, 0, 255), 2)
+    cv2.putText(output_capacitors_size, 'Grande', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+# Mostrar la imagen con los capacitores clasificados
+plt.figure(figsize=(8, 8))
+plt.imshow(cv2.cvtColor(output_capacitors_size, cv2.COLOR_BGR2RGB))
+plt.title('Capacitores clasificados por tamaño')
+plt.axis('off')
+plt.show()
+
+# Contar las resistencias eléctricas
+resistor_count = classify_resistencia(contornos_resistencia)
+#resistor_count = len(resistor_count)
+
+print(f"Cantidad de resistencias eléctricas:",resistor_count)
+
+small_count = len(small_capacitors)
+medium_count = len(medium_capacitors)
+large_count = len(large_capacitors)
+print(f"Cantidad de capacitores pequeños: {small_count}")
+print(f"Cantidad de capacitores medianos: {medium_count}")
+print(f"Cantidad de capacitores grandes: {large_count}")
