@@ -22,11 +22,11 @@
 
    - Ejecutar el primer ejercicio.
      ```
-     $ python TP_PDI_ejercicio1.py
+     $ python ejercicio1.py
      ```
    - Ejecutar el segundo ejercicio.
      ```
-     $ python TP_PDI_ejercicio2.py
+     $ python ejercicio2.py
      ```
 
 
