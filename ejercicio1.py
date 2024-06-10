@@ -5,22 +5,38 @@ import matplotlib.pyplot as plt
 # Cargar la imagen de la placa
 imagen_placa = cv2.imread("img/placa.png")
 
+# Convertir la imagen de BGR a escala de grises
+gray_image = cv2.cvtColor(imagen_placa, cv2.COLOR_BGR2GRAY)
+
+# Aplicar suavizado a la imagen
+blurred_image = cv2.GaussianBlur(gray_image, (5, 5), 0)
+
+# Aplicar el algoritmo de Canny para la detección de bordes
+edges = cv2.Canny(blurred_image, 50, 150)
+
+# Dilatar los bordes para cerrar los contornos
+kernel = np.ones((5, 5), np.uint8)
+dilated_edges = cv2.dilate(edges, kernel, iterations=1)
+
+# Encontrar contornos en los bordes dilatados (para resistencias)
+contours_resistors, _ = cv2.findContours(dilated_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+# Crear una copia de la imagen para dibujar los contornos
+imagen_contornos_resistores = imagen_placa.copy()
+
+# Cargar la imagen de la placa
+imagen_placa = cv2.imread("img/placa.png")
+
 # Convertir la imagen de BGR a HSV
 hsv_image = cv2.cvtColor(imagen_placa, cv2.COLOR_BGR2HSV)
 
 # Definir diccionario de colores
 COLORS = {
-    'yellow': (0, 255, 255),  # amarillo
-    'gray': (128, 128, 128),   # gris
+    'gray': (128, 128, 128),  # gris
     'silver': (192, 192, 192)  # plateado
 }
 
 # Definir rangos de colores en HSV ajustados
-###AGREGAR LA PARTE ROJA... SOLO SE IDENTIFICA EL AMARILLO PARA LA RESISTENCIAS
-# OTRA SOLUCION: UNIR LOS COMPONENTES DETECTADOS COMO RESISTENCIA
-lower_yellow = np.array([15, 50, 50])
-upper_yellow = np.array([35, 255, 255])
-
 lower_gray = np.array([0, 0, 50])
 upper_gray = np.array([200, 50, 150])
 
@@ -37,10 +53,8 @@ def visualizar_rangos_color(imagen, lower_color, upper_color, color_name):
         cv2.rectangle(imagen, (x, y), (x + w, y + h), COLORS[color_name], 2)
     cv2.putText(imagen, f'{color_name.upper()} Range', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, COLORS[color_name], 2)
 
-
 # Visualizar rangos de colores en la imagen original
 imagen_placa_color_ranges = imagen_placa.copy()
-visualizar_rangos_color(imagen_placa_color_ranges, lower_yellow, upper_yellow, 'yellow')
 visualizar_rangos_color(imagen_placa_color_ranges, lower_gray, upper_gray, 'gray')
 visualizar_rangos_color(imagen_placa_color_ranges, lower_silver, upper_silver, 'silver')
 
@@ -51,9 +65,24 @@ plt.axis('off')
 plt.show()
 
 # Segmentar componentes basados en color
-mask_resistencia = cv2.inRange(hsv_image, lower_yellow, upper_yellow)
 mask_chip = cv2.inRange(hsv_image, lower_gray, upper_gray)
 mask_capacitor = cv2.inRange(hsv_image, lower_silver, upper_silver)
+
+# Aplicar preprocesamiento (suavizado) antes de Canny
+blurred_image = cv2.medianBlur(imagen_placa, ksize=8)
+
+# Aplicar el algoritmo de Canny para la detección de bordes
+edges_resistencia = cv2.Canny(blurred_image, 0.20*255, 0.40*255)
+
+#Gradiente morfológico
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
+f_mg = cv2.morphologyEx(edges_resistencia, cv2.MORPH_GRADIENT, kernel)
+
+# Mostrar los bordes detectados por Canny
+plt.imshow(f_mg, cmap='gray')
+plt.title('Bordes detectados por Canny')
+plt.axis('off')
+plt.show()
 
 # Función para post-procesar las máscaras
 def post_process_mask(mask):
@@ -63,64 +92,53 @@ def post_process_mask(mask):
     return mask
 
 # Post-procesar las máscaras
-mask_resistencia = post_process_mask(mask_resistencia)
 mask_chip = post_process_mask(mask_chip)
 mask_capacitor = post_process_mask(mask_capacitor)
 
 # Encontrar los contornos en las máscaras
-contornos_resistencia, _ = cv2.findContours(mask_resistencia, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+contornos_resistencia, _ = cv2.findContours(f_mg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+# Encontrar los contornos en los bordes detectados por Canny (para chips y capacitores)
 contornos_chip, _ = cv2.findContours(mask_chip, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 contornos_capacitor, _ = cv2.findContours(mask_capacitor, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-# Mostrar la imagen con los contornos detectados
-def mostrar_contornos(contornos, imagen, color, etiqueta, umbral_minimo_area, umbral_maximo_area, es_circulo=False):
-    for cnt in contornos:
+# Mostrar la imagen con los contornos detectados y clasificados
+def mostrar_contornos(imagen, contornos_resistencia, contornos_chip, contornos_capacitor):
+    for cnt in contornos_resistencia:
         area = cv2.contourArea(cnt)
-        if area < umbral_minimo_area or area > umbral_maximo_area:
+        if 1800 < area < 4000:  # Ajusta los umbrales según tus necesidades
+            x, y, w, h = cv2.boundingRect(cnt)
+            cv2.rectangle(imagen, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            cv2.putText(imagen, 'RESISTENCIA', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+    # Dibujar contornos rectangulares para chips
+    for cnt in contornos_chip:
+        area = cv2.contourArea(cnt)
+        if area < 90000 or area > 100000:  
             continue
         x, y, w, h = cv2.boundingRect(cnt)
-        if es_circulo:
-            (x, y), radius = cv2.minEnclosingCircle(cnt)
-            center = (int(x), int(y))
-            radius = int(radius)
-            cv2.circle(imagen, center, radius, color, 2)
-            cv2.putText(imagen, etiqueta, (int(x)-40, int(y)-radius-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        else:
-            cv2.rectangle(imagen, (x, y), (x+w, y+h), color, 2)
-            cv2.putText(imagen, etiqueta, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        cv2.rectangle(imagen, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        cv2.putText(imagen, 'CHIP', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    
+    # Dibujar contornos circulares para capacitores
+    for cnt in contornos_capacitor:
+        area = cv2.contourArea(cnt)
+        if area < 7500 or area > 130000: 
+            continue
+        (x, y), radius = cv2.minEnclosingCircle(cnt)
+        center = (int(x), int(y))
+        radius = int(radius)
+        cv2.circle(imagen, center, radius, (255, 0, 0), 2)
+        cv2.putText(imagen, 'CAPACITOR', (int(x) - 40, int(y) - radius - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
-# Dibujar contornos
-imagen_placa_contornos = imagen_placa.copy()
-mostrar_contornos(contornos_resistencia, imagen_placa_contornos, (0, 0, 255), 'RESISTENCIA', 2000, 7000)
-mostrar_contornos(contornos_chip, imagen_placa_contornos, (0, 255, 0), 'CHIP', 90000, 100000)
-mostrar_contornos(contornos_capacitor, imagen_placa_contornos, (255, 0, 0), 'CAPACITOR', 7500, 130000, es_circulo=True)
+# Crear una copia de la imagen original para dibujar los contornos detectados
+imagen_contornos_clasificados = imagen_placa.copy()
 
-# Mostrar las máscaras de cada componente
-plt.figure(figsize=(12, 8))
+# Dibujar los contornos clasificados en la imagen copiada
+mostrar_contornos(imagen_contornos_clasificados, contornos_resistencia, contornos_chip, contornos_capacitor)
 
-plt.subplot(2, 2, 1)
-plt.imshow(cv2.cvtColor(imagen_placa, cv2.COLOR_BGR2RGB))
-plt.title('Imagen Original')
-plt.axis('off')
-
-plt.subplot(2, 2, 2)
-plt.imshow(mask_resistencia, cmap='gray')
-plt.title('Máscara de Resistencia')
-plt.axis('off')
-
-plt.subplot(2, 2, 3)
-plt.imshow(mask_chip, cmap='gray')
-plt.title('Máscara de Chip')
-plt.axis('off')
-
-plt.subplot(2, 2, 4)
-plt.imshow(mask_capacitor, cmap='gray')
-plt.title('Máscara de Capacitor')
-plt.axis('off')
-
+# Mostrar la imagen con los contornos detectados y clasificados
 plt.figure(figsize=(8, 8))
-plt.imshow(cv2.cvtColor(imagen_placa_contornos, cv2.COLOR_BGR2RGB))
+plt.imshow(cv2.cvtColor(imagen_contornos_clasificados, cv2.COLOR_BGR2RGB))
 plt.title('Componentes electrónicos detectados y clasificados')
 plt.axis('off')
-
 plt.show()
