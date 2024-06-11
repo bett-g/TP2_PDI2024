@@ -1,4 +1,4 @@
-## PDI - Trabajo Práctico 2 (TP1)
+## PDI - Trabajo Práctico 2
 
 ### Instrucciones para ejecutar el TP:
 
