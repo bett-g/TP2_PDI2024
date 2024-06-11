@@ -14,9 +14,6 @@ blurred_image = cv2.GaussianBlur(gray_image, (5, 5), 0)
 # Crear una copia de la imagen para dibujar los contornos
 imagen_contornos_resistores = imagen_placa.copy()
 
-# Cargar la imagen de la placa
-imagen_placa = cv2.imread("img/placa.png")
-
 # Convertir la imagen de BGR a HSV
 hsv_image = cv2.cvtColor(imagen_placa, cv2.COLOR_BGR2HSV)
 
