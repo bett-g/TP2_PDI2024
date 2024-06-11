@@ -170,7 +170,8 @@ def procesar_caracteres(path):
     img_caracteres = segmentar_caract(img_tupla, box=True)
     mostrar_imagen('Resultado final: Caracteres Segmentados con Cuadros', img_caracteres)
 
-# Menú principal
+"""
+# PRUEBA PATENTE PUNTUAL
 def main():
     PATENTES_A = ['img/img01.png']
     PATENTES_B = ['img/img01.png']
@@ -191,7 +192,7 @@ main()
 
 
 """
-PRUEBAS VARIAS PATENTES:
+# RESULTADO TODAS LAS PATENTES:
 def main():
     PATENTES_A = [f'img/img{i:02}.png' for i in range(1, 13)]
     PATENTES_B = [f'img/img{i:02}.png' for i in range(1, 13)]
@@ -208,6 +209,4 @@ def main():
         print(f"Procesando patente: {patente}")
         procesar_caracteres(patente)
 
-# Ejecutar la función principal
 main()
-"""
