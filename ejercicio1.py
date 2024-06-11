@@ -143,18 +143,17 @@ def classify_capacitors_by_size(capacitors):
     large = []
 
     for cnt in capacitors:
-        x, y, w, h = cv2.boundingRect(cnt)
-        area = w * h
-        if 7500 <= area < 15000:
-            small.append((x, y, w, h))
-        elif 15000 <= area < 80000:
-            medium.append((x, y, w, h))
-        elif area > 80000:
-            large.append((x, y, w, h))
-
+        area = cv2.contourArea(cnt)
+        radius = np.sqrt(area / np.pi)
+        if 45 <= radius < 80:
+            small.append(cnt)
+        elif 80 <= radius <= 140:
+            medium.append(cnt)
+        elif 140 <= radius < 200:
+            large.append(cnt)
     return small, medium, large
 
-def classify_resistencia(contornos_resistencia):
+def clasificar_resistencia(contornos_resistencia):
     resistor_count = 0
     for contour in contornos_resistencia:
             area = cv2.contourArea(contour)
@@ -170,17 +169,26 @@ small_capacitors, medium_capacitors, large_capacitors = classify_capacitors_by_s
 # Dibujar los capacitores clasificados en la imagen
 output_capacitors_size = imagen_placa.copy()
 
-for (x, y, w, h) in small_capacitors:
-    cv2.rectangle(output_capacitors_size, (x, y), (x + w, y + h), (255, 0, 0), 2)
-    cv2.putText(output_capacitors_size, 'Pequeño', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+for cnt in small_capacitors:
+    (x, y), radius = cv2.minEnclosingCircle(cnt)
+    center = (int(x), int(y))
+    radius = int(radius)
+    cv2.circle(output_capacitors_size, center, radius, (255, 0, 0), 2)
+    cv2.putText(output_capacitors_size, 'PEQUENIO', (int(x) - 40, int(y) - radius - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
 
-for (x, y, w, h) in medium_capacitors:
-    cv2.rectangle(output_capacitors_size, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    cv2.putText(output_capacitors_size, 'Mediano', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+for cnt in medium_capacitors:
+    (x, y), radius = cv2.minEnclosingCircle(cnt)
+    center = (int(x), int(y))
+    radius = int(radius)
+    cv2.circle(output_capacitors_size, center, radius, (0, 255, 0), 2)
+    cv2.putText(output_capacitors_size, 'MEDIANO', (int(x) - 40, int(y) - radius - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-for (x, y, w, h) in large_capacitors:
-    cv2.rectangle(output_capacitors_size, (x, y), (x + w, y + h), (0, 0, 255), 2)
-    cv2.putText(output_capacitors_size, 'Grande', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+for cnt in large_capacitors:
+    (x, y), radius = cv2.minEnclosingCircle(cnt)
+    center = (int(x), int(y))
+    radius = int(radius)
+    cv2.circle(output_capacitors_size, center, radius, (0, 0, 255), 2)
+    cv2.putText(output_capacitors_size, 'GRANDE', (int(x) - 40, int(y) - radius - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
 # Mostrar la imagen con los capacitores clasificados
 plt.figure(figsize=(8, 8))
@@ -190,7 +198,7 @@ plt.axis('off')
 plt.show()
 
 # Contar las resistencias eléctricas
-resistor_count = classify_resistencia(contornos_resistencia)
+resistor_count = clasificar_resistencia(contornos_resistencia)
 #resistor_count = len(resistor_count)
 
 print(f"Cantidad de resistencias eléctricas:",resistor_count)
