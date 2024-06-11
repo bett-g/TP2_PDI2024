@@ -44,7 +44,6 @@ def procesar_patente(path):
         (stats[:, cv2.CC_STAT_AREA] >= AREA_MIN) & 
         (stats[:, cv2.CC_STAT_HEIGHT] < stats[:, cv2.CC_STAT_WIDTH]))
     labels_filtrado = np.argwhere(filtro).flatten().tolist()
-
     idx_patente = labels_filtrado[-1]
     stats_patente = stats[idx_patente]
     sub_imagen = sub_img(img, stats_patente)
